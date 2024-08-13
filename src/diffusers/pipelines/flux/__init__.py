@@ -36,6 +36,7 @@ if TYPE_CHECKING or DIFFUSERS_SLOW_IMPORT:
         from .pipeline_flux import FluxPipeline
         from .pipeline_flux_controlnet import FluxControlNetPipeline
         from .pipeline_flux_inpaint import FluxInpaintPipeline
+        from .pipeline_flux_img2img import FluxImg2ImgPipeline
 else:
     import sys
 
