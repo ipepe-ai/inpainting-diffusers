@@ -255,6 +255,7 @@ else:
             "CLIPImageProjection",
             "CogVideoXPipeline",
             "CycleDiffusionPipeline",
+            "FluxImg2ImgPipeline"
             "FluxInpaintPipeline",
             "FluxControlNetPipeline",
             "FluxPipeline",
@@ -698,6 +699,7 @@ if TYPE_CHECKING or DIFFUSERS_SLOW_IMPORT:
             CogVideoXPipeline,
             CycleDiffusionPipeline,
             FluxControlNetPipeline,
+            FluxImg2ImgPipeline,
             FluxInpaintPipeline,
             FluxPipeline,
             HunyuanDiTControlNetPipeline,
