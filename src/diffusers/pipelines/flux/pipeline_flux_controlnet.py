@@ -61,19 +61,21 @@ EXAMPLE_DOC_STRING = """
         >>> from diffusers import FluxControlNetPipeline
         >>> from diffusers import FluxControlNetModel
 
-        >>> controlnet_model = 'InstantX/FLUX.1-dev-controlnet-canny-alpha'
+        >>> controlnet_model = "InstantX/FLUX.1-dev-controlnet-canny-alpha"
         >>> controlnet = FluxControlNetModel.from_pretrained(controlnet_model, torch_dtype=torch.bfloat16)
-        >>> pipe = FluxControlNetPipeline.from_pretrained(base_model, controlnet=controlnet, torch_dtype=torch.bfloat16)
+        >>> pipe = FluxControlNetPipeline.from_pretrained(
+        ...     base_model, controlnet=controlnet, torch_dtype=torch.bfloat16
+        ... )
         >>> pipe.to("cuda")
         >>> control_image = load_image("https://huggingface.co/InstantX/SD3-Controlnet-Canny/resolve/main/canny.jpg")
         >>> prompt = "A girl in city, 25 years old, cool, futuristic"
         >>> image = pipe(
-                prompt,
-                control_image=control_image,
-                controlnet_conditioning_scale=0.6,
-                num_inference_steps=28,
-                guidance_scale=3.5,
-            ).images[0]
+        ...     prompt,
+        ...     control_image=control_image,
+        ...     controlnet_conditioning_scale=0.6,
+        ...     num_inference_steps=28,
+        ...     guidance_scale=3.5,
+        ... ).images[0]
         >>> image.save("flux.png")
         ```
 """
@@ -384,7 +386,9 @@ class FluxControlNetPipeline(DiffusionPipeline, FluxLoraLoaderMixin):
                 # Retrieve the original scale by scaling back the LoRA layers
                 unscale_lora_layers(self.text_encoder_2, lora_scale)
 
-        text_ids = torch.zeros(batch_size, prompt_embeds.shape[1], 3).to(device=device, dtype=self.text_encoder.dtype)
+        dtype = self.text_encoder.dtype if self.text_encoder is not None else self.transformer.dtype
+        text_ids = torch.zeros(batch_size, prompt_embeds.shape[1], 3).to(device=device, dtype=dtype)
+        text_ids = text_ids.repeat(num_images_per_prompt, 1, 1)
 
         return prompt_embeds, pooled_prompt_embeds, text_ids
 
@@ -436,8 +440,8 @@ class FluxControlNetPipeline(DiffusionPipeline, FluxLoraLoaderMixin):
         if max_sequence_length is not None and max_sequence_length > 512:
             raise ValueError(f"`max_sequence_length` cannot be greater than 512 but is {max_sequence_length}")
 
-    # Copied from diffusers.pipelines.flux.pipeline_flux._prepare_latent_image_ids
     @staticmethod
+    # Copied from diffusers.pipelines.flux.pipeline_flux.FluxPipeline._prepare_latent_image_ids
     def _prepare_latent_image_ids(batch_size, height, width, device, dtype):
         latent_image_ids = torch.zeros(height // 2, width // 2, 3)
         latent_image_ids[..., 1] = latent_image_ids[..., 1] + torch.arange(height // 2)[:, None]
@@ -452,8 +456,8 @@ class FluxControlNetPipeline(DiffusionPipeline, FluxLoraLoaderMixin):
 
         return latent_image_ids.to(device=device, dtype=dtype)
 
-    # Copied from diffusers.pipelines.flux.pipeline_flux._pack_latents
     @staticmethod
+    # Copied from diffusers.pipelines.flux.pipeline_flux.FluxPipeline._pack_latents
     def _pack_latents(latents, batch_size, num_channels_latents, height, width):
         latents = latents.view(batch_size, num_channels_latents, height // 2, 2, width // 2, 2)
         latents = latents.permute(0, 2, 4, 1, 3, 5)
@@ -461,8 +465,8 @@ class FluxControlNetPipeline(DiffusionPipeline, FluxLoraLoaderMixin):
 
         return latents
 
-    # Copied from diffusers.pipelines.flux.pipeline_flux._unpack_latents
     @staticmethod
+    # Copied from diffusers.pipelines.flux.pipeline_flux.FluxPipeline._unpack_latents
     def _unpack_latents(latents, height, width, vae_scale_factor):
         batch_size, num_patches, channels = latents.shape
 
@@ -476,7 +480,7 @@ class FluxControlNetPipeline(DiffusionPipeline, FluxLoraLoaderMixin):
 
         return latents
 
-    # Copied from diffusers.pipelines.flux.pipeline_flux.prepare_latents
+    # Copied from diffusers.pipelines.flux.pipeline_flux.FluxPipeline.prepare_latents
     def prepare_latents(
         self,
         batch_size,
@@ -510,7 +514,7 @@ class FluxControlNetPipeline(DiffusionPipeline, FluxLoraLoaderMixin):
 
         return latents, latent_image_ids
 
-    # Copied from diffusers.pipelines.controlnet.pipeline_controlnet.StableDiffusionControlNetPipeline.prepare_image
+    # Copied from diffusers.pipelines.controlnet_sd3.pipeline_stable_diffusion_3_controlnet.StableDiffusion3ControlNetPipeline.prepare_image
     def prepare_image(
         self,
         image,
@@ -520,6 +524,8 @@ class FluxControlNetPipeline(DiffusionPipeline, FluxLoraLoaderMixin):
         num_images_per_prompt,
         device,
         dtype,
+        do_classifier_free_guidance=False,
+        guess_mode=False,
     ):
         if isinstance(image, torch.Tensor):
             pass
@@ -537,6 +543,9 @@ class FluxControlNetPipeline(DiffusionPipeline, FluxLoraLoaderMixin):
         image = image.repeat_interleave(repeat_by, dim=0)
 
         image = image.to(device=device, dtype=dtype)
+
+        if do_classifier_free_guidance and not guess_mode:
+            image = torch.cat([image] * 2)
 
         return image
 
