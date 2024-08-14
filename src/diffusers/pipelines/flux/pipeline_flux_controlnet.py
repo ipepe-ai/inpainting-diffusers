@@ -577,6 +577,7 @@ class FluxControlNetPipeline(DiffusionPipeline, FluxLoraLoaderMixin):
         timesteps: List[int] = None,
         guidance_scale: float = 7.0,
         control_image: PipelineImageInput = None,
+        control_mode: int = None,
         controlnet_conditioning_scale: Union[float, List[float]] = 1.0,
         num_images_per_prompt: Optional[int] = 1,
         generator: Optional[Union[torch.Generator, List[torch.Generator]]] = None,
@@ -736,6 +737,11 @@ class FluxControlNetPipeline(DiffusionPipeline, FluxLoraLoaderMixin):
                 width_control_image,
             )
 
+            # control mode
+            if control_mode is not None:
+                control_mode = torch.tensor(control_mode).to(device, dtype=torch.long)
+                control_mode = control_mode.reshape([-1, 1])
+
         # 4. Prepare latent variables
         num_channels_latents = self.transformer.config.in_channels // 4
         latents, latent_image_ids = self.prepare_latents(
@@ -791,6 +797,7 @@ class FluxControlNetPipeline(DiffusionPipeline, FluxLoraLoaderMixin):
                 controlnet_block_samples, controlnet_single_block_samples = self.controlnet(
                     hidden_states=latents,
                     controlnet_cond=control_image,
+                    controlnet_mode=control_mode,
                     conditioning_scale=controlnet_conditioning_scale,
                     timestep=timestep / 1000,
                     guidance=guidance,
