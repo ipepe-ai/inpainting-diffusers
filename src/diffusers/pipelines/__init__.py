@@ -125,6 +125,8 @@ else:
         "AnimateDiffVideoToVideoPipeline",
     ]
     _import_structure["flux"] = [
+        "FluxControlNetInpaintPipeline",
+        "FluxControlNetImg2ImgPipeline",
         "FluxControlNetPipeline",
         "FluxImg2ImgPipeline",
         "FluxInpaintPipeline",
@@ -498,7 +500,14 @@ if TYPE_CHECKING or DIFFUSERS_SLOW_IMPORT:
             VersatileDiffusionTextToImagePipeline,
             VQDiffusionPipeline,
         )
-        from .flux import FluxControlNetPipeline, FluxImg2ImgPipeline, FluxInpaintPipeline, FluxPipeline
+        from .flux import (
+            FluxControlNetImg2ImgPipeline,
+            FluxControlNetInpaintPipeline,
+            FluxControlNetPipeline,
+            FluxImg2ImgPipeline,
+            FluxInpaintPipeline,
+            FluxPipeline,
+        )
         from .hunyuandit import HunyuanDiTPipeline
         from .i2vgen_xl import I2VGenXLPipeline
         from .kandinsky import (
