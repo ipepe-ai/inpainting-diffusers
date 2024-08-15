@@ -35,7 +35,13 @@ if TYPE_CHECKING or DIFFUSERS_SLOW_IMPORT:
     except OptionalDependencyNotAvailable:
         from ...utils.dummy_torch_and_transformers_objects import *  # noqa F403
     else:
-        from .pipeline_flux import FluxPipeline
+        from .pipeline_flux import (
+            FluxControlNetImg2ImgPipeline,
+            FluxControlNetInpaintPipeline,
+            FluxImg2ImgPipeline,
+            FluxInpaintPipeline,
+            FluxPipeline,
+        )
         from .pipeline_flux_controlnet import FluxControlNetPipeline
 else:
     import sys
