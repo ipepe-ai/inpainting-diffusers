@@ -51,17 +51,21 @@ EXAMPLE_DOC_STRING = """
     Examples:
         ```py
         >>> import torch
-        >>> from diffusers import FluxPipeline
+        >>> from diffusers import FluxInpaintPipeline
+        >>> from diffusers.utils import load_image
 
-        >>> pipe = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-schnell", torch_dtype=torch.bfloat16)
+        >>> pipe = FluxInpaintPipeline.from_pretrained("black-forest-labs/FLUX.1-schnell", torch_dtype=torch.bfloat16)
         >>> pipe.to("cuda")
-        >>> prompt = "A cat holding a sign that says hello world"
-        >>> # Depending on the variant being used, the pipeline call will slightly vary.
-        >>> # Refer to the pipeline documentation for more details.
-        >>> image = pipe(prompt, num_inference_steps=4, guidance_scale=0.0).images[0]
-        >>> image.save("flux.png")
+        >>> prompt = "Face of a yellow cat, high resolution, sitting on a park bench"
+        >>> img_url = "https://raw.githubusercontent.com/CompVis/latent-diffusion/main/data/inpainting_examples/overture-creations-5sI6fQgYIuo.png"
+        >>> mask_url = "https://raw.githubusercontent.com/CompVis/latent-diffusion/main/data/inpainting_examples/overture-creations-5sI6fQgYIuo_mask.png"
+        >>> source = load_image(img_url)
+        >>> mask = load_image(mask_url)
+        >>> image = pipe(prompt=prompt, image=source, mask_image=mask).images[0]
+        >>> image.save("flux_inpainting.png")
         ```
-"""
+        ```
+        """
 
 
 def calculate_shift(
@@ -891,26 +895,6 @@ class FluxInpaintPipeline(DiffusionPipeline, FluxLoraLoaderMixin):
         )
         num_warmup_steps = max(len(timesteps) - num_inference_steps * self.scheduler.order, 0)
 
-        if num_channels_transformer == 132:
-            # default case for inpainting models
-            num_channels_mask = mask.shape[1]
-            num_channels_masked_image = masked_image_latents.shape[1]
-            if (
-                num_channels_latents + num_channels_mask + num_channels_masked_image
-                != self.transformer.config.in_channels
-            ):
-                raise ValueError(
-                    f"Incorrect configuration settings! The config of `pipeline.transformer`: {self.transformer.config} expects"
-                    f" {self.transformer.config.in_channels} but received `num_channels_latents`: {num_channels_latents} +"
-                    f" `num_channels_mask`: {num_channels_mask} + `num_channels_masked_image`: {num_channels_masked_image}"
-                    f" = {num_channels_latents+num_channels_masked_image+num_channels_mask}. Please verify the config of"
-                    " `pipeline.transformer` or your `mask_image` or `image` input."
-                )
-        if num_channels_transformer != 64:
-            raise ValueError(
-                f"The transformer {self.transformer.__class__} should have 64 input channels, not {self.transformer.config.in_channels}."
-            )
-
         # 6. Denoising loop
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
@@ -947,17 +931,17 @@ class FluxInpaintPipeline(DiffusionPipeline, FluxLoraLoaderMixin):
                 latents_dtype = latents.dtype
                 latents = self.scheduler.step(noise_pred, t, latents, return_dict=False)[0]
 
-                if num_channels_transformer == 64:
-                    init_latents_proper = image_latents
-                    init_mask = mask
+                # for 64 channel transformer only.
+                init_latents_proper = image_latents
+                init_mask = mask
 
-                    if i < len(timesteps) - 1:
-                        noise_timestep = timesteps[i + 1]
-                        init_latents_proper = self.scheduler.scale_noise(
-                            init_latents_proper, torch.tensor([noise_timestep]), noise
-                        )
+                if i < len(timesteps) - 1:
+                    noise_timestep = timesteps[i + 1]
+                    init_latents_proper = self.scheduler.scale_noise(
+                        init_latents_proper, torch.tensor([noise_timestep]), noise
+                    )
 
-                    latents = (1 - init_mask) * init_latents_proper + init_mask * latents
+                latents = (1 - init_mask) * init_latents_proper + init_mask * latents
 
                 if latents.dtype != latents_dtype:
                     if torch.backends.mps.is_available():
